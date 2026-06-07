@@ -1,6 +1,6 @@
 # Trabalho do GB — Fractal de Mandelbrot (concluído)
 
-Arquitetura produtor-consumidor com dois buffers, conforme o quadro do professor:
+Arquitetura produtor-consumidor com dois buffers
 
 ```
  MAIN  --cria tarefas-->  [BUFFER DE TAREFAS]
