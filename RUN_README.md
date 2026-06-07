@@ -1,11 +1,31 @@
 ## 1. Compilação
-**g++ main.cpp -o main -pthread**
+**g++ -O2 -ffast-math main.cpp -o main -lgdiplus -pthread**
 
+> O `-O2` liga as otimizações do compilador (faz uma diferença enorme em cálculo puro como esse).
+> ⚠️ O `-ffast-math` é OBRIGATÓRIO: a `calcular_iteracoes` usa `std::complex`, que sem essa
+> flag fica ~50x mais lento (a multiplicação de complexos chama uma função de biblioteca com
+> checagem de Inf/NaN a cada passo). Com `-ffast-math` fica tão rápido quanto o cálculo na mão.
+> O `-lgdiplus` é necessário para gerar o PNG; o `-pthread` para as threads.
 
-## 2. Execução (largura da imagem, altura da imagem, quantidade de quadrantes)
-**./main.exe [qnt_linhas] [qnt_colunas] [quadrantes_por_linha]**
+## 2. Execução
+**./main.exe**
 
-### Exemplo Prático:
-#### Para gerar uma imagem em resolução Full HD (1920x1080) dividida em uma grade de 5x5 quadrantes (25 tarefas no total), execute:
+### Parâmetros (editar no início da função `main()` em `main.cpp` e recompilar):
+- **LARGURA / ALTURA** — dimensões da imagem, em pixels.
+- **MAX_ITERACOES** — complexidade do Mandelbrot (mais = mais detalhe e mais lento).
+- **NUM_WORKERS** — número de threads trabalhadoras. Referência boa: ~ número de núcleos da CPU.
+- **TAMANHO_TAREFA** — cada tarefa é um bloco de `TAMANHO_TAREFA x TAMANHO_TAREFA` pixels.
+- **REAL_MIN / REAL_MAX** — faixa horizontal (real) da janela. Aproxime os dois para dar zoom.
+- **IMAG_CENTRO** — centro vertical da janela. A altura imaginária é derivada da proporção
+  da imagem automaticamente (mantém os pixels quadrados, sem esticar o fractal).
 
-**./main.exe 1080 1920 5**
+### Saída:
+Gera o arquivo **resultado.png** na pasta de execução.
+
+## 3. Organização do código (`main.cpp`)
+1. **Cor** — a cor de um pixel.
+2. **MandelbrotSet** — parâmetros + imagem + a matemática do fractal (encapsula tudo).
+3. **Paralelização** — `Tarefa`, `Resultado`, `RecursosCompartilhados` (os dois buffers + mutexes/cond),
+   e as threads `worker_trabalhador` / `thread_impressora`.
+4. **Saída** — geração do PNG via GDI+.
+5. **main** — define os parâmetros e dispara a renderização.
