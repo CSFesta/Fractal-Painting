@@ -19,5 +19,5 @@ Arquitetura produtor-consumidor com dois buffers
 - [x] **Parâmetros do programa** — `NUM_WORKERS`, `TAMANHO_TAREFA`, `MAX_ITER`, dimensões e janela do plano complexo.
 
 ## Possíveis extensões
-- Fazer também em MPI (+0,5 ponto, segundo o quadro).
+- Fazer também em MPI
 - Pintar o pixel por id da thread (modo de depuração, para visualizar o fatiamento).
