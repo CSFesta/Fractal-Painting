@@ -1,0 +1,30 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build main",
+            "type": "shell",
+            "command": "g++",
+            "args": [
+                "main.cpp",
+                "-o",
+                "main.exe",
+                "-g",
+                "-O0",
+                "-pthread",
+                "-lgdiplus",
+                "-lgdi32",
+                "-lole32",
+                "-luuid"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/code"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$gcc"]
+        }
+    ]
+}
