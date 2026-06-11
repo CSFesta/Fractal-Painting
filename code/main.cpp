@@ -3,6 +3,7 @@
 #include <queue>
 #include <complex>
 #include <utility>
+#include <cstring>
 #include <pthread.h>
 #include <windows.h>
 #include <winerror.h> // garante NO_ERROR para o gdiplus quando o pthread.h vem antes
@@ -372,19 +373,66 @@ void escrever_png(MandelbrotSet& mandelbrot, const wchar_t* nome_arquivo) {
     // o Bitmap e destruido aqui; o GDI+ continua ativo (so e desligado na main)
 }
 
-int main() {
-    // ---- Parametros do programa ----
+int main(int argc, char* argv[]) {
+    // ---- Parametros do programa (com defaults) ----
     const int LARGURA        = 1000;  // largura da imagem, em pixels
     const int ALTURA         = 1000;  // altura  da imagem, em pixels
-    const int MAX_ITERACOES  = 10000; // complexidade do Mandelbrot
-    const int NUM_WORKERS    = 24;    // nro de threads trabalhadoras
-    const int TAMANHO_TAREFA = 32;   // cada tarefa e um bloco de TAMANHO_TAREFA x TAMANHO_TAREFA pixels
+    int MAX_ITERACOES  = 10000; // complexidade do Mandelbrot
+    int NUM_WORKERS    = 24;    // nro de threads trabalhadoras
+    int TAMANHO_TAREFA = 32;   // cada tarefa e um bloco de TAMANHO_TAREFA x TAMANHO_TAREFA pixels
 
     // Para dar mais zoom, aproxime REAL_MIN/REAL_MAX e ajuste o centro.
     const double REAL_MIN    = -0.74877;
     const double REAL_MAX    = -0.74872;
     const double IMAG_CENTRO = 0.06505;
 
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--tamanho") == 0) {
+            if (++i >= argc) { cerr << "Erro: --tamanho requer um valor.\n"; return 1; }
+            try {
+                TAMANHO_TAREFA = stoi(argv[i]);
+                if (TAMANHO_TAREFA <= 0) throw invalid_argument("");
+            } catch (...) {
+                cerr << "Erro: tamanho da tarefa deve ser um inteiro positivo.\n";
+                return 1;
+            }
+        } else if (strcmp(argv[i], "-w") == 0 || strcmp(argv[i], "--workers") == 0) {
+            if (++i >= argc) { cerr << "Erro: --workers requer um valor.\n"; return 1; }
+            try {
+                NUM_WORKERS = stoi(argv[i]);
+                if (NUM_WORKERS <= 0) throw invalid_argument("");
+            } catch (...) {
+                cerr << "Erro: numero de workers deve ser um inteiro positivo.\n";
+                return 1;
+            }
+        } else if (strcmp(argv[i], "-i") == 0 || strcmp(argv[i], "--iteracoes") == 0) {
+            if (++i >= argc) { cerr << "Erro: --iteracoes requer um valor.\n"; return 1; }
+            try {
+                MAX_ITERACOES = stoi(argv[i]);
+                if (MAX_ITERACOES <= 0) throw invalid_argument("");
+            } catch (...) {
+                cerr << "Erro: numero de iteracoes deve ser um inteiro positivo.\n";
+                return 1;
+            }
+        } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
+            cout << "Uso: main.exe [opcoes]\n\n";
+            cout << "Opcoes:\n";
+            cout << "  -t, --tamanho <N>      Tamanho da tarefa em pixels (padrao: 32)\n";
+            cout << "  -w, --workers <N>      Numero de threads trabalhadoras (padrao: 24)\n";
+            cout << "  -i, --iteracoes <N>    Maximo de iteracoes / complexidade (padrao: 10000)\n";
+            cout << "  -h, --help             Exibe esta mensagem de ajuda\n";
+            return 0;
+        } else {
+            cerr << "Erro: opcao desconhecida \"" << argv[i] << "\"\n";
+            cerr << "Use --help para ver as opcoes disponiveis.\n";
+            return 1;
+        }
+    }
+
+    cout << "Parametros:\n";
+    cout << "  Tamanho da tarefa: " << TAMANHO_TAREFA << "\n";
+    cout << "  Workers:           " << NUM_WORKERS << "\n";
+    cout << "  Max iteracoes:     " << MAX_ITERACOES << "\n";
     cout << "Iniciando o programa...\n";
 
     // 1) cria o conjunto (parametros + imagem alocada + matematica pronta)
