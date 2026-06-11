@@ -16,6 +16,7 @@ Arquitetura produtor-consumidor com dois buffers
 - [x] **Thread de impressão** — consome o buffer de resultados e desenha na imagem.
 - [x] **Pintar pixel** — cor derivada do número de iterações do Mandelbrot (`iteracoes_para_cor`).
 - [x] **Sincronização** — mutex nos dois buffers + condition variable avisando a impressora.
+- [x] **Visualização em tempo real** — janela Win32 (GDI) na thread de impressão mostra cada bloco sendo pintado durante o render.
 - [x] **Parâmetros do programa** — `NUM_WORKERS`, `TAMANHO_TAREFA`, `MAX_ITER`, dimensões e janela do plano complexo.
 
 ## Possíveis extensões

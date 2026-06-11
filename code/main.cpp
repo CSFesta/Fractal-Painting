@@ -171,10 +171,90 @@ void* worker_trabalhador(void* argumento) {
     return nullptr;
 }
 
+// ================== Janela de tempo real (Win32 + GDI) ==================
+// Mostra a imagem sendo pintada bloco a bloco, enquanto o render roda.
+// REGRA do Win32: a janela pertence a thread que a criou, e essa MESMA thread
+// precisa processar as mensagens dela. Por isso tudo aqui roda na impressora.
+
+static MandelbrotSet* g_mandelbrot = nullptr; // imagem que a janela mostra
+
+// Desenha um retangulo da imagem direto na janela (converte Cor -> B,G,R,X do GDI).
+void desenhar_na_janela(HWND janela, int x, int y, int largura, int altura) {
+    vector<BYTE> bgra((size_t)largura * altura * 4);
+    size_t i = 0;
+    for (int py = y; py < y + altura; py++) {
+        for (int px = x; px < x + largura; px++) {
+            Cor c = g_mandelbrot->pixel(px, py);
+            bgra[i++] = (BYTE)c.b;
+            bgra[i++] = (BYTE)c.g;
+            bgra[i++] = (BYTE)c.r;
+            bgra[i++] = 0;
+        }
+    }
+    // 32 bits por pixel; altura NEGATIVA = linha 0 e a de CIMA
+    BITMAPINFO info = {};
+    info.bmiHeader = { sizeof(BITMAPINFOHEADER), largura, -altura, 1, 32, BI_RGB };
+    HDC contexto = GetDC(janela);
+    SetDIBitsToDevice(contexto, x, y, largura, altura, 0, 0, 0, altura,
+                      bgra.data(), &info, DIB_RGB_COLORS);
+    ReleaseDC(janela, contexto);
+}
+
+// Funcao que o Windows chama para cada mensagem da janela (pintar, fechar, ...).
+LRESULT CALLBACK proc_janela(HWND janela, UINT mensagem, WPARAM wparam, LPARAM lparam) {
+    if (mensagem == WM_PAINT) { // o Windows pede para repintar (ex: foi descoberta)
+        PAINTSTRUCT pintura;
+        BeginPaint(janela, &pintura);
+        desenhar_na_janela(janela, 0, 0, g_mandelbrot->largura, g_mandelbrot->altura);
+        EndPaint(janela, &pintura);
+        return 0;
+    }
+    if (mensagem == WM_DESTROY) { // a janela foi fechada
+        PostQuitMessage(0);       // poe um WM_QUIT na fila para avisar o nosso loop
+        return 0;
+    }
+    return DefWindowProcW(janela, mensagem, wparam, lparam); // o resto e padrao
+}
+
+// Cria a janela com a area util do tamanho exato da imagem (nullptr se falhar).
+HWND criar_janela(int largura, int altura) {
+    WNDCLASSW classe = {};
+    classe.lpfnWndProc   = proc_janela;
+    classe.hInstance     = GetModuleHandleW(nullptr);
+    classe.lpszClassName = L"JanelaMandelbrot";
+    classe.hCursor       = LoadCursor(nullptr, IDC_ARROW);
+    RegisterClassW(&classe);
+
+    RECT retangulo = {0, 0, largura, altura}; // area util -> tamanho total c/ borda
+    AdjustWindowRect(&retangulo, WS_OVERLAPPEDWINDOW, FALSE);
+    HWND janela = CreateWindowW(L"JanelaMandelbrot", L"Mandelbrot - pintando...",
+                                WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
+                                retangulo.right - retangulo.left,
+                                retangulo.bottom - retangulo.top,
+                                nullptr, nullptr, classe.hInstance, nullptr);
+    if (janela != nullptr) ShowWindow(janela, SW_SHOW);
+    return janela;
+}
+
+// Processa as mensagens pendentes sem bloquear
+bool processar_mensagens() {
+    MSG mensagem;
+    while (PeekMessageW(&mensagem, nullptr, 0, 0, PM_REMOVE)) {
+        if (mensagem.message == WM_QUIT) return false;
+        TranslateMessage(&mensagem);
+        DispatchMessageW(&mensagem);
+    }
+    return true;
+}
+
 void* thread_impressora(void* argumento) {
     // mesma ideia do worker: do void* de volta para o objeto real (por referencia)
     RecursosCompartilhados& recursos = *(RecursosCompartilhados*)argumento;
     MandelbrotSet& mandelbrot = *recursos.mandelbrot;
+
+    g_mandelbrot = &mandelbrot;
+    HWND janela = criar_janela(mandelbrot.largura, mandelbrot.altura);
+    bool aberta = (janela != nullptr); // se falhar, renderiza sem visualizacao
 
     for (int i = 0; i < recursos.total_tarefas; i++) {
         // 1) pega um resultado (dorme esperando se o buffer estiver vazio)
@@ -193,6 +273,24 @@ void* thread_impressora(void* argumento) {
                 mandelbrot.pixel(resultado.x_inicio + px, resultado.y_inicio + py)
                     = resultado.pixels[indice++];
             }
+        }
+
+        // 3) desenha o bloco na janela e processa as mensagens pendentes dela.
+        if (aberta) {
+            desenhar_na_janela(janela, resultado.x_inicio, resultado.y_inicio,
+                               resultado.largura, resultado.altura);
+            aberta = processar_mensagens();
+        }
+    }
+
+    // 4) render completo: deixa a janela aberta ate o usuario fechar
+    if (aberta) {
+        SetWindowTextW(janela, L"Mandelbrot - concluido! (feche a janela para gravar o PNG)");
+        cout << "Render concluido! Feche a janela para gravar o PNG e encerrar.\n";
+        MSG mensagem;
+        while (GetMessageW(&mensagem, nullptr, 0, 0) > 0) {
+            TranslateMessage(&mensagem);
+            DispatchMessageW(&mensagem);
         }
     }
     return nullptr;
@@ -218,7 +316,8 @@ void renderizar_em_paralelo(RecursosCompartilhados& recursos, int num_workers, i
         pthread_join(workers[i], nullptr);
     }
 
-    // espera a impressora desenhar o ultimo resultado
+    // espera a impressora terminar (ela so retorna depois que o usuario
+    // fechar a janela de visualizacao)
     pthread_join(impressora, nullptr);
 }
 
